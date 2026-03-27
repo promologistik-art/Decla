@@ -1,9 +1,16 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
 import os
+import sys
 import asyncio
 import tempfile
 from datetime import datetime
 
-from telegram import Update, Document
+# Добавляем текущую директорию в путь для импорта
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
+from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
 from config import BOT_TOKEN, DATA_DIR, OUTPUT_DIR
@@ -23,7 +30,7 @@ class UserSession:
         self.total_income = 0.0
         self.tax_payable = 0.0
         
-    def add_bank_statement(self, file_path, operations):
+    def add_bank_statement(self, operations):
         self.bank_statements.extend(operations)
         
     def set_ens_data(self, ens_data):
@@ -88,7 +95,7 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
             income_ops = parser.parse()
             
             if income_ops:
-                session.add_bank_statement(tmp_path, income_ops)
+                session.add_bank_statement(income_ops)
                 total = sum(op['amount'] for op in income_ops)
                 await update.message.reply_text(
                     f"✅ Обработано!\n"
@@ -173,14 +180,13 @@ async def report(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         # Сортируем все операции по дате
         all_ops = []
-        for stmt in session.bank_statements:
-            all_ops.extend(stmt)
+        for ops in session.bank_statements:
+            all_ops.extend(ops)
         all_ops.sort(key=lambda x: x['date'])
         
         # Генерируем КУДиР
         kudir_gen = KudirGenerator(all_ops)
         kudir_data = kudir_gen.generate()
-        quarterly_totals = kudir_gen.get_quarterly_totals()
         
         # Сохраняем КУДиР
         kudir_excel = os.path.join(OUTPUT_DIR, f"kudir_{user_id}.xlsx")
@@ -280,6 +286,10 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 def main():
     """Запуск бота"""
+    # Создаем папки если их нет
+    os.makedirs(DATA_DIR, exist_ok=True)
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    
     app = Application.builder().token(BOT_TOKEN).build()
     
     # Команды

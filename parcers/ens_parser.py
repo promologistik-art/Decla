@@ -1,5 +1,9 @@
 import pandas as pd
 from datetime import datetime
+import sys
+import os
+
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils.helpers import safe_float
 
 class ENSParser:
@@ -16,8 +20,15 @@ class ENSParser:
     def parse(self):
         """Парсинг CSV выписки ЕНС"""
         try:
-            # Читаем CSV с разделителем ;
-            df = pd.read_csv(self.file_path, sep=';', encoding='utf-8')
+            # Пробуем разные разделители
+            for sep in [';', ',', '\t']:
+                try:
+                    df = pd.read_csv(self.file_path, sep=sep, encoding='utf-8')
+                    if len(df.columns) > 1:
+                        break
+                except:
+                    continue
+            
             self._parse_dataframe(df)
             return {
                 'insurance_accrued': self.insurance_accrued,
@@ -35,11 +46,11 @@ class ENSParser:
             operation = str(row.get('Наименование операции', ''))
             kbk = str(row.get('КБК', ''))
             amount = safe_float(row.get('Сумма операции', 0))
-            date = row.get('Дата записи', '')
+            date_str = str(row.get('Дата записи', ''))
             
             # Парсим дату
             try:
-                date_obj = datetime.strptime(str(date), '%Y-%m-%d')
+                date_obj = datetime.strptime(date_str.split()[0], '%Y-%m-%d')
             except:
                 date_obj = None
             
@@ -53,15 +64,12 @@ class ENSParser:
             
             # Уплата
             elif 'Уплата' in operation:
-                if kbk == '18201061201010000510':  # ЕНП
-                    # Это может быть уплата взносов или налога
-                    # Определяем по дате и сумме
+                if 'ЕНП' in str(row.get('Наименование обязательства', '')) or kbk == '18201061201010000510':
                     self.usn_payments.append({
                         'date': date_obj,
                         'amount': amount
                     })
                     
-                    # Проверяем, не уплата ли это взносов
                     # Если дата > 31.12.2025, то это взносы за 2025, уплаченные в 2026
                     if date_obj and date_obj.year == 2026:
                         self.insurance_paid += amount
@@ -69,7 +77,6 @@ class ENSParser:
     
     def can_deduct_insurance_for_year(self, year):
         """Можно ли вычесть взносы за указанный год"""
-        # Для 2025 года: вычет только если взносы уплачены до 31.12.2025
         if year == 2025:
             for date in self.insurance_paid_dates:
                 if date and date.year == 2025:

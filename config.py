@@ -3,18 +3,14 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-BOT_TOKEN = os.getenv("BOT_TOKEN")
+BOT_TOKEN = os.getenv("BOT_TOKEN", "")
 ADMIN_IDS = [int(id) for id in os.getenv("ADMIN_IDS", "").split(",") if id]
 
 # Папки
 DATA_DIR = "data"
 OUTPUT_DIR = "output"
 
-# Создаем папки если их нет
-os.makedirs(DATA_DIR, exist_ok=True)
-os.makedirs(OUTPUT_DIR, exist_ok=True)
-
-# Ключевые слова для определения дохода (можно расширять)
+# Ключевые слова для определения дохода
 INCOME_KEYWORDS = [
     "оплата за товар",
     "оплата по договору",
@@ -23,6 +19,8 @@ INCOME_KEYWORDS = [
     "озон",
     "по реестру",
     "оплата по контракту",
+    "платеж по ден.треб",
+    "за товар",
 ]
 
 # Исключаемые операции

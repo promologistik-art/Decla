@@ -1,12 +1,16 @@
 import pandas as pd
 import re
 from datetime import datetime
+from config import INCOME_KEYWORDS, EXCLUDE_KEYWORDS
 
 def safe_float(value):
     """Безопасное преобразование в float"""
     try:
         if pd.isna(value):
             return 0.0
+        if isinstance(value, str):
+            cleaned = value.replace(" ", "").replace(",", ".")
+            return float(cleaned)
         return float(value)
     except:
         return 0.0

@@ -1,8 +1,10 @@
 import pandas as pd
-from datetime import datetime
 from openpyxl import Workbook
-from openpyxl.styles import Font, Alignment, Border, Side
-from openpyxl.utils.dataframe import dataframe_to_rows
+from openpyxl.styles import Font, Alignment
+import sys
+import os
+
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 class KudirGenerator:
     """Генератор Книги учета доходов и расходов"""
@@ -22,7 +24,7 @@ class KudirGenerator:
             self.kudir_data.append({
                 '№ п/п': idx,
                 'Дата и номер документа': f"{op['date'].strftime('%d.%m.%Y')} {op['document']}",
-                'Содержание операции': op['purpose'][:200],  # Ограничиваем длину
+                'Содержание операции': op['purpose'][:200],
                 'Сумма дохода': op['amount']
             })
     
@@ -52,7 +54,7 @@ class KudirGenerator:
         ws['A1'].font = Font(bold=True, size=14)
         ws.merge_cells('A1:D1')
         
-        ws['A2'] = f"за 2025 год"
+        ws['A2'] = "за 2025 год"
         ws.merge_cells('A2:D2')
         
         # Заголовки колонок
@@ -86,14 +88,3 @@ class KudirGenerator:
         wb.save(filepath)
         
         return total_amount
-    
-    def export_to_pdf(self, filepath):
-        """Экспорт КУДиР в PDF (упрощенная версия с сохранением как PDF)"""
-        # Для простоты используем Excel + конвертация
-        excel_path = filepath.replace('.pdf', '.xlsx')
-        total = self.export_to_excel(excel_path)
-        
-        # Здесь можно добавить конвертацию Excel -> PDF
-        # Но для MVP оставим Excel
-        
-        return total

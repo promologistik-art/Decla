@@ -1,6 +1,12 @@
 import pandas as pd
 from datetime import datetime
-from utils.helpers import safe_float, parse_date, clean_sum, is_income
+import sys
+import os
+
+# Добавляем путь к корневой папке
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from utils.helpers import safe_float, parse_date, is_income
 
 class BankStatementParser:
     """Парсер выписок из банков"""
@@ -62,57 +68,37 @@ class BankStatementParser:
             elif 'назначение' in col_str or 'содержание' in col_str or 'назначение платежа' in col_str:
                 col_purpose = col
         
-        if col_date is None or (col_credit is None and col_debit is None):
-            # Пробуем альтернативный формат (с колонкой Сумма и направлением)
-            if 'сумма' in df.columns:
-                # Проверяем знак суммы
-                for idx, row in df.iterrows():
-                    amount = safe_float(row.get('сумма', 0))
-                    purpose = str(row.get('назначение', row.get('назначение платежа', '')))
-                    date = parse_date(row.get('дата', ''))
-                    
-                    if date and amount > 0 and is_income(purpose):
-                        self.income_operations.append({
-                            'date': date,
-                            'amount': amount,
-                            'purpose': purpose,
-                            'document': row.get('номер', f"п/п {idx+1}"),
-                            'counterparty': row.get('контрагент', '')
-                        })
+        if col_date is None:
             return
         
-        # Стандартный парсинг
+        # Проходим по строкам
         for idx, row in df.iterrows():
             date = parse_date(row.get(col_date))
             if not date:
                 continue
             
-            # Определяем сумму (кредит = доход, дебет = расход)
-            amount = safe_float(row.get(col_credit, 0))
-            is_credit = True
+            purpose = str(row.get(col_purpose, ''))
             
+            # Пробуем найти сумму в кредите
+            amount = 0
+            if col_credit:
+                amount = safe_float(row.get(col_credit, 0))
+            
+            # Если не нашли в кредите, ищем в дебете (но со знаком минус)
             if amount == 0 and col_debit:
                 amount = safe_float(row.get(col_debit, 0))
-                is_credit = False
+                if amount > 0:
+                    amount = -amount
             
             if amount == 0:
                 continue
             
-            purpose = str(row.get(col_purpose, ''))
-            
             # Если это доход (кредит) и подходит по ключевым словам
-            if is_credit and amount > 0 and is_income(purpose):
+            if amount > 0 and is_income(purpose):
                 self.income_operations.append({
                     'date': date,
                     'amount': amount,
                     'purpose': purpose,
                     'document': f"п/п {idx+1}",
-                    'counterparty': str(row.get('контрагент', ''))
+                    'counterparty': str(row.get('контрагент', '')) if 'контрагент' in df.columns else ''
                 })
-            
-            self.all_operations.append({
-                'date': date,
-                'amount': amount,
-                'is_income': is_credit and amount > 0 and is_income(purpose),
-                'purpose': purpose
-            })
